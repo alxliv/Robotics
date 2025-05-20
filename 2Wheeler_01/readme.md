@@ -7,4 +7,6 @@ Brief description
    git clone https://github.com/alxliv/Robotics.git
 
 ## Hardware:
-2 Motors.
+Two DC Motors - 520 Gear Motor With Encoder
+
+
