@@ -1,4 +1,4 @@
-![WIP- Work In Progress](https://img.shields.io/badge/My%20Header-red?style=flat)
+*** WIP- Work In Progress ***
 
 # 2-Wheeler Controlled by Raspberry PI PICO-2W
 Using excellent official Raspberry Pi Pico Extension for VSCode by raspberrypi.com
