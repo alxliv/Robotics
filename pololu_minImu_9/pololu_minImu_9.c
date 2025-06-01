@@ -3,34 +3,13 @@
 #include "hardware/i2c.h"
 #include "all_timer_task.h"
 #include "gyro_accel.h"
+#include "mag_lis3mdl.h"
 
 // #define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
 
 #define GYRO_ACCEL_ADDR LSM6DSO_I2C_ADDR
-#define MAGNETO_METER_ADDR (0x1E) // LIS3MDL sensor
+#define MAGNETO_METER_ADDR LIS3MDL_I2C_ADDR // magnetometer LIS3MDL sensor
 
-#define CTRL_REG1 0x20
-#define CTRL_REG2 0x21
-#define CTRL_REG3 0x22
-#define CTRL_REG4 0x23
-#define CTRL_REG5 0x24
-
-#define ODR_10HZ 0x10 // DO[2:0]=100 → 10 Hz, TEMP_EN=0, FAST_ODR=0
-#define CTRL_REG3 0x22
-#define CONTINUOUS_MODE 0x00 // MD[1:0]=00
-
-/****************************
- * CTRL_REG1 bits:
-| Bit(s) | Name      | Description                                 | Values                                                                                                                                              |
-| :----: | :-------- | :------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
-|    7   | TEMP\_EN  | Temperature sensor enable                   | 0 = disabled (default)<br>1 = enabled ([STMicroelectronics][1])                                                                                     |
-|   6–5  | OM$1:0$   | X/Y-axes operating mode selection           | 00 = Low-power<br>01 = Medium-performance<br>10 = High-performance<br>11 = Ultra-high-performance ([STMicroelectronics][1])                         |
-|   4–2  | DO$2:0$   | Output data-rate selection                  | 000 = 0.625 Hz<br>001 = 1.25 Hz<br>010 = 2.5 Hz<br>011 = 5 Hz<br>100 = 10 Hz<br>101 = 20 Hz<br>110 = 40 Hz<br>111 = 80 Hz ([STMicroelectronics][1]) |
-|    1   | FAST\_ODR | Fast-output-data-rate enable (beyond 80 Hz) | 0 = disabled (≤ 80 Hz)<br>1 = enabled (1000/560/300/155 Hz depending on OM) ([STMicroelectronics][1])                                               |
-|    0   | ST        | Self-test enable                            | 0 = disabled (default)<br>1 = enabled ([STMicroelectronics][1])                                                                                     |
-
-[1]: https://www.st.com/resource/en/datasheet/lis3mdl.pdf "Datasheet - LIS3MDL - Digital output magnetic sensor:  ultralow-power, high-performance 3-axis magnetometer"
-*****************************/
 extern void calibrate_magneto();
 
 // Pico W devices use a GPIO on the WIFI chip for the LED,
@@ -64,11 +43,6 @@ int i2c_write_reg(uint8_t dev_addr, uint8_t reg_addr, uint8_t value)
     return 0;
 }
 
-static void write_mag_reg(uint8_t reg, uint8_t value)
-{
-    i2c_write_reg(MAGNETO_METER_ADDR, reg, value);
-}
-
 int i2c_read_regs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_t len)
 {
     int retc = i2c_write_blocking(i2c_default, dev_addr, &reg_addr, 1, true);
@@ -86,28 +60,16 @@ int i2c_read_regs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_t le
     return 0;
 }
 
-void read_magneto(uint8_t *buf, uint16_t nbytes)
-{
-    // Burst-read six data bytes (X_L…), convert, print
-    uint8_t reg = 0x28 | 0x80; // OUT_X_L with auto-increment
-    i2c_read_regs(MAGNETO_METER_ADDR, reg, buf, nbytes);
-}
-
 void magneto_callback(TimerTask *tt, uint32_t now_us)
 {
-    magnetoData.point_num = tt->counter;
-    magnetoData.timestamp_us = now_us;
-
-    // Burst-read six data bytes (X_L…), convert, print
-    uint8_t reg = 0x28 | 0x80; // OUT_X_L with auto-increment
-    uint8_t raw[6];
-    read_magneto(raw, 6);
-    int16_t x = (raw[1] << 8) | raw[0];
-    int16_t y = (raw[3] << 8) | raw[2];
-    int16_t z = (raw[5] << 8) | raw[4];
-    magnetoData.mX = x;
-    magnetoData.mY = y;
-    magnetoData.mZ = z;
+    SENSOR_DATA *sd = &magnetoData;
+    sd->point_num = tt->counter;
+    sd->timestamp_us = now_us;
+    if (lis3mdl_read(&sd->mX, &sd->mY, &sd->mZ) != 0)
+    {
+        printf("is3mdl_read() failed. STOP.\n");
+        hard_assert(false);
+    }
 }
 
 void gyro_callback(TimerTask *tt, uint32_t now_us)
@@ -194,7 +156,9 @@ void i2c_scan(i2c_inst_t *i2c)
 
 void info_callback(TimerTask *tt, uint32_t now_us)
 {
-    SENSOR_DATA *sd = &accelData;
+    // SENSOR_DATA *sd = &accelData;
+    SENSOR_DATA *sd = &gyroData;
+    // SENSOR_DATA *sd = &magnetoData;
 
     printf("%d,%d,%d\n", sd->mX, sd->mY, sd->mZ);
 }
@@ -203,23 +167,6 @@ static void led_callback(TimerTask *tt, uint32_t now_us)
 {
     bool onoff = (tt->counter % 2 == 0);
     pico_set_led(onoff);
-}
-
-static void set_mag_default()
-{
-    // --- Configure LIS3MDL for 10 Hz continuous mode ---
-    write_mag_reg(CTRL_REG1, 0x70); // ultra-high-performance for X and Y + 10Hz ODR
-    // 0x00 = 0b00000000
-    // FS = 00 (+/- 4 gauss full scale)
-    write_mag_reg(CTRL_REG2, 0x00);
-    write_mag_reg(CTRL_REG3, CONTINUOUS_MODE);
-    // 0x0C = 0b00001100
-    // OMZ = 11 (ultra-high-performance mode for Z)
-    write_mag_reg(CTRL_REG4, 0x0C);
-
-    // 0x40 = 0b01000000
-    // BDU = 1 (block data update)
-    write_mag_reg(CTRL_REG5, 0x40);
 }
 
 int main()
@@ -250,7 +197,8 @@ int main()
         printf("ERROR: GYRO_ACCEL device NOT found!. STOP!!!\n");
         hard_assert(false);
     }
-    set_mag_default();
+
+    lis3mdl_init();
     lsm6dso_init();
 
     sleep_ms(3000);
