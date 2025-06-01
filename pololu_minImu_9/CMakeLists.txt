@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(pololu_minImu_9 pololu_minImu_9.c calibrate_magneto.c)
+add_executable(pololu_minImu_9 pololu_minImu_9.c gyro_accel.c calibrate_magneto.c)
 
 pico_set_program_name(pololu_minImu_9 "pololu_minImu_9")
 pico_set_program_version(pololu_minImu_9 "0.1")

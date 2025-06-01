@@ -75,21 +75,21 @@ static void process_samples(const MAGNETO_DATA *pd)
 
     for (int i = 0; i < NUM_SAMPLES; i++)
     {
-        printf("%d, %d\n", pd[i].mX,pd[i].mY);
+        printf("%d, %d\n", pd[i].mX, pd[i].mY);
     }
     printf("\n");
     printf("YZ plane:\n");
 
     for (int i = 0; i < NUM_SAMPLES; i++)
     {
-        printf("%d, %d\n", pd[i].mY,pd[i].mZ);
+        printf("%d, %d\n", pd[i].mY, pd[i].mZ);
     }
     printf("\n");
     printf("XZ plane:\n");
 
     for (int i = 0; i < NUM_SAMPLES; i++)
     {
-        printf("%d, %d\n", pd[i].mX,pd[i].mZ);
+        printf("%d, %d\n", pd[i].mX, pd[i].mZ);
     }
     printf("\n");
 
@@ -148,17 +148,15 @@ void calibrate_magneto()
     TT_Init(&infoTask, 1000 * 1000, info_callback); // once a sec
     infoTask.user_data = &collectTask;
 
-    int nloop = 0;
     for (;;)
     {
-        nloop++;
         uint32_t now_us = time_us_32();
-        TT_Update(&collectTask, now_us);
+        TT_Update(&collectTask, &now_us);
         if (collectTask.counter >= NUM_SAMPLES)
         {
             break;
         }
-        TT_Update(&infoTask, now_us);
+        TT_Update(&infoTask, &now_us);
     }
 
     process_samples((MAGNETO_DATA *)data);

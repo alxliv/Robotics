@@ -2,10 +2,11 @@
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "all_timer_task.h"
+#include "gyro_accel.h"
 
 // #define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
 
-#define GYRO_ACCEL_ADDR (0x6B)
+#define GYRO_ACCEL_ADDR LSM6DSO_I2C_ADDR
 #define MAGNETO_METER_ADDR (0x1E) // LIS3MDL sensor
 
 #define CTRL_REG1 0x20
@@ -32,44 +33,64 @@
 *****************************/
 extern void calibrate_magneto();
 
-static void write_mag_reg(uint8_t reg, uint8_t value)
-{
-    uint8_t buf[2];
-    buf[0] = reg;
-    buf[1] = value;
-    i2c_write_blocking(i2c_default, MAGNETO_METER_ADDR, buf, 2, false);
-}
-
 // Pico W devices use a GPIO on the WIFI chip for the LED,
 // so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined
 #ifdef CYW43_WL_GPIO_LED_PIN
 #include "pico/cyw43_arch.h"
 #endif
 
-
 typedef struct
 {
     uint32_t point_num;
     uint32_t timestamp_us;
     int16_t mX, mY, mZ;
-    int16_t min_mX, min_mY, min_mZ;
-    int16_t max_mX, max_mY, max_mZ;
-} MAGNETO_DATA;
+} SENSOR_DATA;
 
-MAGNETO_DATA magnetoData = {0, 0, 0, 0, 0,
-            32767, 32767, 32767,
-            -32768, -32768, -32768
-};
+SENSOR_DATA magnetoData = {0, 0, 0, 0, 0};
+SENSOR_DATA gyroData = {0, 0, 0, 0, 0};
+SENSOR_DATA accelData = {0, 0, 0, 0, 0};
 
-#define min(a,b) ((a)<(b))?(a):(b);
-#define max(a,b) ((a)>(b))?(a):(b);
+int i2c_write_reg(uint8_t dev_addr, uint8_t reg_addr, uint8_t value)
+{
+    uint8_t buf[2];
+    buf[0] = reg_addr;
+    buf[1] = value;
+    int retc = i2c_write_blocking(i2c_default, dev_addr, buf, 2, false);
+    if (retc != 2)
+    {
+        printf("i2c_write failed (len=%d, retc=%d)\n", 2, retc);
+        hard_assert(false);
+    }
+    return 0;
+}
 
-void read_magneto(uint8_t *buf, int nbytes)
+static void write_mag_reg(uint8_t reg, uint8_t value)
+{
+    i2c_write_reg(MAGNETO_METER_ADDR, reg, value);
+}
+
+int i2c_read_regs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_t len)
+{
+    int retc = i2c_write_blocking(i2c_default, dev_addr, &reg_addr, 1, true);
+    if (retc != 1)
+    {
+        printf("i2c_write failed (len=%d, retc=%d)\n", 1, retc);
+        hard_assert(false);
+    }
+    retc = i2c_read_blocking(i2c_default, dev_addr, data, len, false);
+    if (retc != len)
+    {
+        printf("i2c_read failed (len=%d, retc=%d)\n", len, retc);
+        hard_assert(false);
+    }
+    return 0;
+}
+
+void read_magneto(uint8_t *buf, uint16_t nbytes)
 {
     // Burst-read six data bytes (X_L…), convert, print
     uint8_t reg = 0x28 | 0x80; // OUT_X_L with auto-increment
-    i2c_write_blocking(i2c_default, MAGNETO_METER_ADDR, &reg, 1, true);
-    i2c_read_blocking(i2c_default, MAGNETO_METER_ADDR, buf, nbytes, false);
+    i2c_read_regs(MAGNETO_METER_ADDR, reg, buf, nbytes);
 }
 
 void magneto_callback(TimerTask *tt, uint32_t now_us)
@@ -85,18 +106,25 @@ void magneto_callback(TimerTask *tt, uint32_t now_us)
     int16_t y = (raw[3] << 8) | raw[2];
     int16_t z = (raw[5] << 8) | raw[4];
     magnetoData.mX = x;
-    magnetoData.min_mX = min(magnetoData.min_mX, x);
-    magnetoData.max_mX = max(magnetoData.max_mX, x);
-
     magnetoData.mY = y;
-    magnetoData.min_mY = min(magnetoData.min_mY, y);
-    magnetoData.max_mY = max(magnetoData.max_mY, y);
-
     magnetoData.mZ = z;
-    magnetoData.min_mZ = min(magnetoData.min_mZ, z);
-    magnetoData.max_mZ = max(magnetoData.max_mZ, z);
 }
 
+void gyro_callback(TimerTask *tt, uint32_t now_us)
+{
+    SENSOR_DATA *sd = &gyroData;
+    sd->point_num = tt->counter;
+    sd->timestamp_us = now_us;
+    lsm6dso_read_gyro_mdps(&sd->mX, &sd->mY, &sd->mZ);
+}
+
+void accel_callback(TimerTask *tt, uint32_t now_us)
+{
+    SENSOR_DATA *sd = &accelData;
+    sd->point_num = tt->counter;
+    sd->timestamp_us = now_us;
+    lsm6dso_read_accel_mg(&sd->mX, &sd->mY, &sd->mZ);
+}
 
 // Perform initialisation
 int pico_led_init(void)
@@ -133,6 +161,8 @@ bool reserved_addr(uint8_t addr)
 }
 
 bool magneto_ok = false;
+bool gyro_accel_ok = false;
+
 void i2c_scan(i2c_inst_t *i2c)
 {
     printf("Scanning I2C bus...\n");
@@ -146,7 +176,10 @@ void i2c_scan(i2c_inst_t *i2c)
             {
                 char *devname = "UNKNOWN";
                 if (addr == GYRO_ACCEL_ADDR)
+                {
                     devname = "GYRO_ACCEL_ADDR";
+                    gyro_accel_ok = true;
+                }
                 else if (addr == MAGNETO_METER_ADDR)
                 {
                     devname = "MAGNETO_METER_ADDR";
@@ -161,16 +194,9 @@ void i2c_scan(i2c_inst_t *i2c)
 
 void info_callback(TimerTask *tt, uint32_t now_us)
 {
-//    printf("%d,%d,%d\n",  magnetoData.mX, magnetoData.mY, magnetoData.mZ);
-    printf("%d,%d\n",  magnetoData.mX, magnetoData.mY);
+    SENSOR_DATA *sd = &accelData;
 
-#if 0
-    printf("[%d]: x=%d(%d:%d), y=%d(%d:%d), z=%d(%d:%d)\n", magnetoData.point_num,
-        magnetoData.mX, magnetoData.min_mX, magnetoData.max_mX,
-        magnetoData.mY, magnetoData.min_mY, magnetoData.max_mY,
-        magnetoData.mZ, magnetoData.min_mZ, magnetoData.max_mZ
-    );
-#endif
+    printf("%d,%d,%d\n", sd->mX, sd->mY, sd->mZ);
 }
 
 static void led_callback(TimerTask *tt, uint32_t now_us)
@@ -219,30 +245,41 @@ int main()
         printf("ERROR: Magnetometer device NOT found!. STOP!!!\n");
         hard_assert(false);
     }
-
+    if (!gyro_accel_ok)
+    {
+        printf("ERROR: GYRO_ACCEL device NOT found!. STOP!!!\n");
+        hard_assert(false);
+    }
     set_mag_default();
+    lsm6dso_init();
 
     sleep_ms(3000);
 #ifdef CALIBRATE_MAGNETOMETER
     calibrate_magneto();
-    for (;;);
+    for (;;)
+        ;
 #endif
 
     TimerTask magnetoTask;
     TT_Init(&magnetoTask, 100 * 1000, magneto_callback); // 10Hz
+    TimerTask gyroTask;
+    TT_Init(&gyroTask, 100 * 1000, gyro_callback); // 10Hz
+    TimerTask accelTask;
+    TT_Init(&accelTask, 100 * 1000, accel_callback); // 10Hz
+
     TimerTask infoTask;
     TT_Init(&infoTask, 250 * 1000, info_callback);
     TimerTask ledTask;
     TT_Init(&ledTask, 500 * 1000, led_callback);
 
     printf("v0.1 minIMU-9 started.\n");
-    int nloop = 0;
     while (true)
     {
-        nloop++;
         uint32_t now_us = time_us_32();
-        TT_Update(&magnetoTask, now_us);
-        TT_Update(&infoTask, now_us);
-        TT_Update(&ledTask, now_us);
+        TT_Update(&magnetoTask, &now_us);
+        TT_Update(&gyroTask, &now_us);
+        TT_Update(&accelTask, &now_us);
+        TT_Update(&infoTask, &now_us);
+        TT_Update(&ledTask, &now_us);
     }
 }

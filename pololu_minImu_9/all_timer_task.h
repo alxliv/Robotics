@@ -21,15 +21,16 @@ static void TT_Init(TimerTask *tt, uint32_t interval_us, timer_task_callback_t c
     tt->counter = 0;
 }
 
-static void TT_Update(TimerTask *tt, uint32_t now_us)
+static void TT_Update(TimerTask *tt, uint32_t *ptr_now_us)
 {
-    if (now_us - tt->last_us >= tt->interval_us)
+    if (*ptr_now_us - tt->last_us >= tt->interval_us)
     {
         tt->last_us += tt->interval_us;
         if (tt->callback)
         {
-            tt->callback(tt, now_us);
+            tt->callback(tt, *ptr_now_us);
             tt->counter++;
+            *ptr_now_us = time_us_32();
         }
     }
 }
