@@ -4,7 +4,7 @@
 #include "pico/stdlib.h"
 #include "all_timer_task.h"
 
-const int NUM_SAMPLES = 500;
+const int NUM_SAMPLES = 200;
 extern void read_magneto(uint8_t *buf, int nbytes);
 
 typedef struct
@@ -70,6 +70,31 @@ static void get_min_max(uint16_t *buf, int16_t *pmin, int16_t *pmax)
 static void process_samples(const MAGNETO_DATA *pd)
 {
     printf("Processing..\n");
+    printf("Step 0\n");
+    printf("XY plane:\n");
+
+    for (int i = 0; i < NUM_SAMPLES; i++)
+    {
+        printf("%d, %d\n", pd[i].mX,pd[i].mY);
+    }
+    printf("\n");
+    printf("YZ plane:\n");
+
+    for (int i = 0; i < NUM_SAMPLES; i++)
+    {
+        printf("%d, %d\n", pd[i].mY,pd[i].mZ);
+    }
+    printf("\n");
+    printf("XZ plane:\n");
+
+    for (int i = 0; i < NUM_SAMPLES; i++)
+    {
+        printf("%d, %d\n", pd[i].mX,pd[i].mZ);
+    }
+    printf("\n");
+
+    return;
+
     uint16_t *d = malloc(NUM_SAMPLES * sizeof(uint16_t));
     if (!d)
     {

@@ -161,11 +161,16 @@ void i2c_scan(i2c_inst_t *i2c)
 
 void info_callback(TimerTask *tt, uint32_t now_us)
 {
+//    printf("%d,%d,%d\n",  magnetoData.mX, magnetoData.mY, magnetoData.mZ);
+    printf("%d,%d\n",  magnetoData.mX, magnetoData.mY);
+
+#if 0
     printf("[%d]: x=%d(%d:%d), y=%d(%d:%d), z=%d(%d:%d)\n", magnetoData.point_num,
         magnetoData.mX, magnetoData.min_mX, magnetoData.max_mX,
         magnetoData.mY, magnetoData.min_mY, magnetoData.max_mY,
         magnetoData.mZ, magnetoData.min_mZ, magnetoData.max_mZ
     );
+#endif
 }
 
 static void led_callback(TimerTask *tt, uint32_t now_us)
@@ -226,7 +231,7 @@ int main()
     TimerTask magnetoTask;
     TT_Init(&magnetoTask, 100 * 1000, magneto_callback); // 10Hz
     TimerTask infoTask;
-    TT_Init(&infoTask, 1000 * 1000, info_callback);
+    TT_Init(&infoTask, 250 * 1000, info_callback);
     TimerTask ledTask;
     TT_Init(&ledTask, 500 * 1000, led_callback);
 
