@@ -1,11 +1,12 @@
 #include <stdio.h>
+#include <math.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
 #include "all_timer_task.h"
 #include "gyro_accel.h"
 #include "mag_lis3mdl.h"
 
-// #define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
+//#define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
 
 #define GYRO_ACCEL_ADDR LSM6DSO_I2C_ADDR
 #define MAGNETO_METER_ADDR LIS3MDL_I2C_ADDR // magnetometer LIS3MDL sensor
@@ -154,13 +155,99 @@ void i2c_scan(i2c_inst_t *i2c)
     printf("Scan complete.\n");
 }
 
+/*
+ * Given:
+ *   ax, ay, az = raw accelerometer readings (e.g. in [g] or any units proportional to gravity).
+ *   mx, my, mz = raw magnetometer readings (e.g. in μT or any units proportional to the Earth field).
+ *
+ * Outputs:
+ *   out_nx, out_ny, out_nz = a unit-length vector pointing toward magnetic north, in the device’s body frame.
+ *
+ * Returns 0 on success, -1 if any vector is zero length or invalid.
+ */
+
+int compute_tilt_compensated_north(
+    float ax, float ay, float az,
+    float mx, float my, float mz,
+    float *out_nx, float *out_ny, float *out_nz,
+    float *heading_deg)
+{
+    // 1) Normalize accelerometer: g = accel / ||accel||
+    float normA = sqrtf(ax * ax + ay * ay + az * az);
+    if (normA < 1e-6f)
+        return -1; // invalid accel vector
+    float gx = ax / normA;
+    float gy = ay / normA;
+    float gz = az / normA;
+
+    // 2) Normalize magnetometer: m = mag / ||mag||
+    float normM = sqrtf(mx * mx + my * my + mz * mz);
+    if (normM < 1e-6f)
+        return -1; // invalid mag vector
+    float mxn = mx / normM;
+    float myn = my / normM;
+    float mzn = mz / normM;
+
+    // 3) East = m × g
+    float Ex = myn * gz - mzn * gy;
+    float Ey = mzn * gx - mxn * gz;
+    float Ez = mxn * gy - myn * gx;
+    float normE = sqrtf(Ex * Ex + Ey * Ey + Ez * Ez);
+    if (normE < 1e-6f)
+        return -1; // device is exactly aligned with magnetic field?
+
+    Ex /= normE;
+    Ey /= normE;
+    Ez /= normE;
+
+    // 4) North = g × E
+    float Nx = gy * Ez - gz * Ey;
+    float Ny = gz * Ex - gx * Ez;
+    float Nz = gx * Ey - gy * Ex;
+    float normN = sqrtf(Nx * Nx + Ny * Ny + Nz * Nz);
+    if (normN < 1e-6f)
+        return -1;
+
+    Nx /= normN;
+    Ny /= normN;
+    Nz /= normN;
+
+    // 5) Output
+    *out_nx = Nx;
+    *out_ny = Ny;
+    *out_nz = Nz;
+    // Suppose the device’s forward-facing axis is +X in body frame,
+    // and we want heading = 0° when pointing toward magnetic north.
+    float heading_rad = atan2f(Ex, Nx);
+    // Convert to [0, 2π):
+    if (heading_rad < 0)
+        heading_rad += 2.0f * (float)M_PI;
+    *heading_deg = heading_rad * 180.0f / (float)M_PI;
+    return 0;
+}
+
 void info_callback(TimerTask *tt, uint32_t now_us)
 {
-    // SENSOR_DATA *sd = &accelData;
-    SENSOR_DATA *sd = &gyroData;
+#if 0
+    SENSOR_DATA *sd = &accelData;
+    // SENSOR_DATA *sd = &gyroData;
     // SENSOR_DATA *sd = &magnetoData;
 
     printf("%d,%d,%d\n", sd->mX, sd->mY, sd->mZ);
+#endif
+
+#if 1
+    float out_nx, out_ny, out_nz;
+    float heading_deg;
+    compute_tilt_compensated_north(
+        accelData.mX, accelData.mY, accelData.mZ,
+        magnetoData.mX, magnetoData.mY, magnetoData.mZ,
+        &out_nx, &out_ny, &out_nz,
+        &heading_deg);
+
+    printf("%f\n", heading_deg);
+#endif
+
 }
 
 static void led_callback(TimerTask *tt, uint32_t now_us)
@@ -204,8 +291,7 @@ int main()
     sleep_ms(3000);
 #ifdef CALIBRATE_MAGNETOMETER
     calibrate_magneto();
-    for (;;)
-        ;
+    for (;;){};
 #endif
 
     TimerTask magnetoTask;

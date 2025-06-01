@@ -25,6 +25,10 @@
 [1]: https://www.st.com/resource/en/datasheet/lis3mdl.pdf "Datasheet - LIS3MDL - Digital output magnetic sensor:  ultralow-power, high-performance 3-axis magnetometer"
 *****************************/
 
+const int OFFS_X = 0;
+const int OFFS_Y = 1000;
+const int OFFS_Z = 0;
+
 /*
  * Stub: write 'len' bytes from 'data' to device 'dev_addr' starting at register 'reg_addr'.
  * Return 0 on success, non-zero on failure. Replace with your platform's I2C write routine.
@@ -96,10 +100,9 @@ int lis3mdl_read(int16_t *out_x, int16_t *out_y, int16_t *out_z)
         return ret;
     }
 
-    /* Combine and convert to mg (1 LSB = 0.061 mg for ±2 g) */
-    *out_x = combine_bytes(buf[0], buf[1]);
-    *out_y = combine_bytes(buf[2], buf[3]);
-    *out_z = combine_bytes(buf[4], buf[5]);
+    *out_x = combine_bytes(buf[0], buf[1]) + OFFS_X;
+    *out_y = combine_bytes(buf[2], buf[3]) + OFFS_Y;
+    *out_z = combine_bytes(buf[4], buf[5]) + OFFS_Z;
 
     return 0;
 }

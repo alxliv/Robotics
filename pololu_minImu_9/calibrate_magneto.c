@@ -3,8 +3,9 @@
 #include <math.h>
 #include "pico/stdlib.h"
 #include "all_timer_task.h"
+#include "mag_lis3mdl.h"
 
-const int NUM_SAMPLES = 200;
+const int NUM_SAMPLES = 300;
 extern void read_magneto(uint8_t *buf, int nbytes);
 
 typedef struct
@@ -22,14 +23,11 @@ static void collect_callback(TimerTask *tt, uint32_t now_us)
     MAGNETO_DATA *pd = &dataBuf[tt->counter];
     pd->point_num = tt->counter;
     pd->timestamp_us = now_us;
-    uint8_t raw[6];
-    read_magneto(raw, 6);
-    int16_t x = (raw[1] << 8) | raw[0];
-    int16_t y = (raw[3] << 8) | raw[2];
-    int16_t z = (raw[5] << 8) | raw[4];
-    pd->mX = x;
-    pd->mY = y;
-    pd->mZ = z;
+    if (lis3mdl_read(&pd->mX, &pd->mY, &pd->mZ) != 0)
+    {
+        printf("is3mdl_read() failed. STOP.\n");
+        hard_assert(false);
+    }
 }
 
 static void info_callback(TimerTask *tt, uint32_t now_us)
@@ -70,8 +68,11 @@ static void get_min_max(uint16_t *buf, int16_t *pmin, int16_t *pmax)
 static void process_samples(const MAGNETO_DATA *pd)
 {
     printf("Processing..\n");
+#if 0
     printf("Step 0\n");
     printf("XY plane:\n");
+
+
 
     for (int i = 0; i < NUM_SAMPLES; i++)
     {
@@ -93,7 +94,9 @@ static void process_samples(const MAGNETO_DATA *pd)
     }
     printf("\n");
 
+    printf("DONE!");
     return;
+#endif
 
     uint16_t *d = malloc(NUM_SAMPLES * sizeof(uint16_t));
     if (!d)
