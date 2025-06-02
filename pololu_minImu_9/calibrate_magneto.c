@@ -3,6 +3,7 @@
 #include <math.h>
 #include "pico/stdlib.h"
 #include "all_timer_task.h"
+#include "gyro_accel.h"
 #include "mag_lis3mdl.h"
 #include "calibrate_magneto.h"
 
@@ -20,23 +21,25 @@ typedef struct
     int16_t mX, mY, mZ;
 } MAGNETO_DATA;
 
-void load_magneto_calibration()
+void load_magneto_calibration(uint16_t ver)
 {
-#if 0
-    biasX = -230.00;
-    scaleX = 1.061;
-    biasY = -460.00;
-    scaleY = 0.975;
-    biasZ = -287.50;
-    scaleZ = 0.969;
-#endif
 
-    biasX=596.50;
-    scaleX=0.905;
-    biasY=-527.00;
-    scaleY=1.046;
-    biasZ=-381.50;
-    scaleZ=1.064;
+    if (ver==LSM6DSO_WHO_AM_I_ID)
+    {
+        biasX=596.50;
+        scaleX=0.905;
+        biasY=-527.00;
+        scaleY=1.046;
+        biasZ=-381.50;
+        scaleZ=1.064;
+    } else {
+        biasX=2772.50;
+        scaleX=0.999;
+        biasY=-4468.50;
+        scaleY=1.016;
+        biasZ=9290.50;
+        scaleZ=0.986;
+    }
 
 }
 

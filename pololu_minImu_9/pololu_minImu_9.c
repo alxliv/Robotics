@@ -293,10 +293,11 @@ int main()
     }
 
     lis3mdl_init();
-    lsm6dso_init();
+    uint16_t chip_version=0;
+    lsm6dso_init(&chip_version);
 
     sleep_ms(3000);
-    load_magneto_calibration();
+    load_magneto_calibration(chip_version);
 
  #ifdef CALIBRATE_MAGNETOMETER
     calibrate_magneto();

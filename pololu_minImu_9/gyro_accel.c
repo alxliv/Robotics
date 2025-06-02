@@ -4,8 +4,6 @@
 
 /* WHO_AM_I register should return 0x6C for LSM6DSO */
 #define LSM6DSO_WHO_AM_I      0x0F
-#define LSM6DSO_WHO_AM_I_ID   0x6C
-
 /* Control registers */
 #define LSM6DSO_CTRL1_XL      0x10  /* Accel: ODR, FS, LPF1 */
 #define LSM6DSO_CTRL2_G       0x11  /* Gyro: ODR, FS */
@@ -70,19 +68,20 @@ static int16_t combine_bytes(uint8_t low, uint8_t high) {
 /*----------------------------------------------------------------------
  * 6) Initialize LSM6DSO: enable auto-increment, set ODR and full-scale
  *----------------------------------------------------------------------*/
-int lsm6dso_init(void) {
+int lsm6dso_init(uint16_t *pVer) {
     int ret;
     uint8_t who_am_i = 0;
-
+    *pVer = 0;
     /* 6.1) Check WHO_AM_I */
     ret = lsm6dso_read_reg(LSM6DSO_WHO_AM_I, &who_am_i);
     if (ret != 0) {
         return ret;  /* I2C error */
     }
-    if (who_am_i != LSM6DSO_WHO_AM_I_ID) {
-        printf("who_am_i is not LSM6DSO_WHO_AM_I_ID (%d), but %d\n", LSM6DSO_WHO_AM_I_ID, who_am_i);
+    if (who_am_i != LSM6DSO_WHO_AM_I_ID && who_am_i != LSM6DS33_WHO_AM_I_ID) {
+        printf("who_am_i is not LSM6DSO (%d), or LSM6DS33 (%d) but %d\n", LSM6DSO_WHO_AM_I_ID, LSM6DS33_WHO_AM_I_ID, who_am_i);
         return -1;    /* Unexpected device ID */
     }
+    *pVer=who_am_i;
 /*
      * 6.2) Set CTRL3_C:
      *   - BDU = 1    (Block data update: output registers not updated until both high and low bytes read)
