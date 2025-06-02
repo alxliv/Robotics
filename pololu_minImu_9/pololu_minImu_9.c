@@ -7,7 +7,7 @@
 #include "mag_lis3mdl.h"
 #include "calibrate_magneto.h"
 
-// #define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
+//#define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
 
 #define GYRO_ACCEL_ADDR LSM6DSO_I2C_ADDR
 #define MAGNETO_METER_ADDR LIS3MDL_I2C_ADDR // magnetometer LIS3MDL sensor
@@ -253,7 +253,7 @@ void info_callback(TimerTask *tt, uint32_t now_us)
         return;
     }
 
-    printf("%f\n", heading_deg);
+    printf("%.2f\n", heading_deg);
 #endif
 }
 

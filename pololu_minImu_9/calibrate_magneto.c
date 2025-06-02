@@ -33,12 +33,9 @@ void load_magneto_calibration(uint16_t ver)
         biasZ=-381.50;
         scaleZ=1.064;
     } else {
-        biasX=2772.50;
-        scaleX=0.999;
-        biasY=-4468.50;
-        scaleY=1.016;
-        biasZ=9290.50;
-        scaleZ=0.986;
+        biasX=2843.00; scaleX=1.029;
+        biasY=-4795.50; scaleY=1.015;
+        biasZ=9883.50; scaleZ=0.959;
     }
 
 }
@@ -120,10 +117,17 @@ static void compute_calibration()
     scaleZ = R_avg / Rz;
 
     // Print results for debugging
-    printf("Mag Calib Results:\n");
-    printf("  minX=%d, maxX=%d, biasX=%.2f, scaleX=%.3f\n", minX, maxX, biasX, scaleX);
-    printf("  minY=%d, maxY=%d, biasY=%.2f, scaleY=%.3f\n", minY, maxY, biasY, scaleY);
-    printf("  minZ=%d, maxZ=%d, biasZ=%.2f, scaleZ=%.3f\n", minZ, maxZ, biasZ, scaleZ);
+    printf("*** Magnetometer calibration results:\n");
+
+    printf("minX=%d, maxX=%d\n", minX, maxX);
+    printf("minY=%d, maxY=%d\n", minY, maxY);
+    printf("minZ=%d, maxZ=%d\n", minZ, maxZ);
+
+    printf("\n== Insert into calibrate_magneto.c load_magneto_calibration(): ==\n");
+    printf("biasX=%.2f; scaleX=%.3f;\n", biasX, scaleX);
+    printf("biasY=%.2f; scaleY=%.3f;\n", biasY, scaleY);
+    printf("biasZ=%.2f; scaleZ=%.3f;\n", biasZ, scaleZ);
+    printf("==========================================================\n");
 }
 
 void calibrate_magneto()
