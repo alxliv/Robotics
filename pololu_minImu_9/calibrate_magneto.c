@@ -4,9 +4,14 @@
 #include "pico/stdlib.h"
 #include "all_timer_task.h"
 #include "mag_lis3mdl.h"
+#include "calibrate_magneto.h"
 
-const int NUM_SAMPLES = 300;
-extern void read_magneto(uint8_t *buf, int nbytes);
+const int NUM_SAMPLES = 500;
+
+static int16_t minX, maxX, minY, maxY, minZ, maxZ;
+static float biasX, biasY, biasZ;
+static float scaleX, scaleY, scaleZ;
+static float radiusFactory = 0.0f; // optional: if you know Earth’s field magnitude here
 
 typedef struct
 {
@@ -14,6 +19,26 @@ typedef struct
     uint32_t timestamp_us;
     int16_t mX, mY, mZ;
 } MAGNETO_DATA;
+
+void load_magneto_calibration()
+{
+#if 0
+    biasX = -230.00;
+    scaleX = 1.061;
+    biasY = -460.00;
+    scaleY = 0.975;
+    biasZ = -287.50;
+    scaleZ = 0.969;
+#endif
+
+    biasX=596.50;
+    scaleX=0.905;
+    biasY=-527.00;
+    scaleY=1.046;
+    biasZ=-381.50;
+    scaleZ=1.064;
+
+}
 
 static void collect_callback(TimerTask *tt, uint32_t now_us)
 {
@@ -29,139 +54,112 @@ static void collect_callback(TimerTask *tt, uint32_t now_us)
         hard_assert(false);
     }
 }
+static uint16_t data_samples = 0;
+
+static void data_callback(TimerTask *tt, uint32_t now_us)
+{
+    int16_t mx, my, mz;
+
+    if (tt->counter >= NUM_SAMPLES)
+        return;
+    data_samples = tt->counter;
+    if (lis3mdl_read(&mx, &my, &mz) != 0)
+    {
+        printf("is3mdl_read() failed. STOP.\n");
+        hard_assert(false);
+    }
+    if (mx < minX)
+        minX = mx;
+    if (mx > maxX)
+        maxX = mx;
+    if (my < minY)
+        minY = my;
+    if (my > maxY)
+        maxY = my;
+    if (mz < minZ)
+        minZ = mz;
+    if (mz > maxZ)
+        maxZ = mz;
+}
 
 static void info_callback(TimerTask *tt, uint32_t now_us)
 {
     TimerTask *cT = tt->user_data;
-    printf("Samples [%d/%d]..\n", cT->counter, NUM_SAMPLES);
+    printf("Samples [%d/%d]..\n", data_samples, NUM_SAMPLES);
 }
 
-#define TRIM (0.05f) // trim 5% at each end
-
-// comparison function for qsort
-int cmp_int16(const void *a, const void *b)
+static void init(void)
 {
-    int16_t ia = *(const int16_t *)a;
-    int16_t ib = *(const int16_t *)b;
-    return (ia < ib) ? -1 : (ia > ib);
+    minX = INT16_MAX;
+    maxX = -INT16_MAX;
+    minY = INT16_MAX;
+    maxY = -INT16_MAX;
+    minZ = INT16_MAX;
+    maxZ = -INT16_MAX;
 }
 
-// Compute trimmed-min/max on a sorted buffer
-void trimmed_min_max(int16_t *buf, int n, float trim,
-                     int16_t *min_out, int16_t *max_out)
+static void compute_calibration()
 {
-    int i_min = (int)floorf(trim * n);
-    int i_max = (int)ceilf((1.0f - trim) * n) - 1;
-    if (i_min < 0)
-        i_min = 0;
-    if (i_max >= n)
-        i_max = n - 1;
-    *min_out = buf[i_min];
-    *max_out = buf[i_max];
-}
-static void get_min_max(uint16_t *buf, int16_t *pmin, int16_t *pmax)
-{
-    qsort(buf, NUM_SAMPLES, sizeof(int16_t), cmp_int16);
-    trimmed_min_max(buf, NUM_SAMPLES, TRIM, pmin, pmax);
-}
+    // 3.1 Hard-iron biases
+    biasX = (maxX + minX) * 0.5f;
+    biasY = (maxY + minY) * 0.5f;
+    biasZ = (maxZ + minZ) * 0.5f;
 
-static void process_samples(const MAGNETO_DATA *pd)
-{
-    printf("Processing..\n");
-#if 0
-    printf("Step 0\n");
-    printf("XY plane:\n");
+    // 3.2 Half-ranges
+    float Rx = (maxX - minX) * 0.5f;
+    float Ry = (maxY - minY) * 0.5f;
+    float Rz = (maxZ - minZ) * 0.5f;
+    float R_avg = (Rx + Ry + Rz) / 3.0f;
 
+    // 3.4 Soft-iron scale factors
+    scaleX = R_avg / Rx;
+    scaleY = R_avg / Ry;
+    scaleZ = R_avg / Rz;
 
-
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        printf("%d, %d\n", pd[i].mX, pd[i].mY);
-    }
-    printf("\n");
-    printf("YZ plane:\n");
-
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        printf("%d, %d\n", pd[i].mY, pd[i].mZ);
-    }
-    printf("\n");
-    printf("XZ plane:\n");
-
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        printf("%d, %d\n", pd[i].mX, pd[i].mZ);
-    }
-    printf("\n");
-
-    printf("DONE!");
-    return;
-#endif
-
-    uint16_t *d = malloc(NUM_SAMPLES * sizeof(uint16_t));
-    if (!d)
-    {
-        printf("malloc (process_samples) failed!\n");
-        for (;;)
-        {
-        }
-    }
-    int16_t minV, maxV;
-
-    printf("axis X\n");
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        d[i] = pd[i].mX;
-    }
-    get_min_max(d, &minV, &maxV);
-    printf("(%d : %d) Offset=%d\n\n", minV, maxV, (minV + maxV) / 2);
-    printf("axis Y\n");
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        d[i] = pd[i].mY;
-    }
-    get_min_max(d, &minV, &maxV);
-    printf("(%d : %d) Offset=%d\n\n", minV, maxV, (minV + maxV) / 2);
-    printf("axis Z\n");
-    for (int i = 0; i < NUM_SAMPLES; i++)
-    {
-        d[i] = pd[i].mZ;
-    }
-    get_min_max(d, &minV, &maxV);
-    printf("(%d : %d) Offset=%d\n\n", minV, maxV, (minV + maxV) / 2);
-    free(d);
-    printf("ALL DONE OK.\n");
+    // Print results for debugging
+    printf("Mag Calib Results:\n");
+    printf("  minX=%d, maxX=%d, biasX=%.2f, scaleX=%.3f\n", minX, maxX, biasX, scaleX);
+    printf("  minY=%d, maxY=%d, biasY=%.2f, scaleY=%.3f\n", minY, maxY, biasY, scaleY);
+    printf("  minZ=%d, maxZ=%d, biasZ=%.2f, scaleZ=%.3f\n", minZ, maxZ, biasZ, scaleZ);
 }
 
 void calibrate_magneto()
 {
-    char *data = (char *)malloc(sizeof(MAGNETO_DATA));
-    if (!data)
-    {
-        printf("calibrate_magneto() malloc failed!\n");
-        return;
-    }
     printf("Starting MAGENTOMETER Calibration\n");
-    printf("Collecting %d samples\n", NUM_SAMPLES);
+    printf("Will run for %d samples\n", NUM_SAMPLES);
     printf("Rotate magentometer around X,Y and Z axis\n");
-    TimerTask collectTask;
-    TT_Init(&collectTask, 100 * 1000, collect_callback); // 10Hz
-    collectTask.user_data = data;
+    init();
+
+    TimerTask dataTask;
+    TT_Init(&dataTask, 100 * 1000, data_callback); // 10Hz
     TimerTask infoTask;
     TT_Init(&infoTask, 1000 * 1000, info_callback); // once a sec
-    infoTask.user_data = &collectTask;
 
     for (;;)
     {
         uint32_t now_us = time_us_32();
-        TT_Update(&collectTask, &now_us);
-        if (collectTask.counter >= NUM_SAMPLES)
+        TT_Update(&dataTask, &now_us);
+        if (dataTask.counter >= NUM_SAMPLES)
         {
             break;
         }
         TT_Update(&infoTask, &now_us);
     }
 
-    process_samples((MAGNETO_DATA *)data);
-    free(data);
+    //    process_samples((MAGNETO_DATA *)data);
+    compute_calibration();
+}
+
+void magnetometer_apply_calibration(int16_t mx_raw, int16_t my_raw, int16_t mz_raw,
+                                    float *mx_cal, float *my_cal, float *mz_cal)
+{
+    // 4.1 Subtract hard-iron bias (in raw counts)
+    float mx_centered = (float)mx_raw - biasX;
+    float my_centered = (float)my_raw - biasY;
+    float mz_centered = (float)mz_raw - biasZ;
+
+    // 4.2 Apply scale factors to remove soft-iron
+    *mx_cal = mx_centered * scaleX;
+    *my_cal = my_centered * scaleY;
+    *mz_cal = mz_centered * scaleZ;
 }

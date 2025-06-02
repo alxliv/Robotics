@@ -24,10 +24,17 @@
 
 [1]: https://www.st.com/resource/en/datasheet/lis3mdl.pdf "Datasheet - LIS3MDL - Digital output magnetic sensor:  ultralow-power, high-performance 3-axis magnetometer"
 *****************************/
-
+/*
 const int OFFS_X = 0;
-const int OFFS_Y = 1000;
+const int OFFS_Y = 0; // 1000;
 const int OFFS_Z = 0;
+*/
+const int MIN_X = -1100;
+const int MAX_X = 2400;
+const int MIN_Y = -2800;
+const int MAX_Y = 1600;
+const int MIN_Z = -3330;
+const int MAX_Z = -450;
 
 /*
  * Stub: write 'len' bytes from 'data' to device 'dev_addr' starting at register 'reg_addr'.
@@ -100,9 +107,27 @@ int lis3mdl_read(int16_t *out_x, int16_t *out_y, int16_t *out_z)
         return ret;
     }
 
-    *out_x = combine_bytes(buf[0], buf[1]) + OFFS_X;
-    *out_y = combine_bytes(buf[2], buf[3]) + OFFS_Y;
-    *out_z = combine_bytes(buf[4], buf[5]) + OFFS_Z;
+    *out_x = combine_bytes(buf[0], buf[1]);
+    *out_y = combine_bytes(buf[2], buf[3]);
+    *out_z = combine_bytes(buf[4], buf[5]);
+
+ #if 0
+    float x = combine_bytes(buf[0], buf[1]);
+    float y = combine_bytes(buf[2], buf[3]);
+    float z = combine_bytes(buf[4], buf[5]);
+
+    x = (x > MAX_X) ? MAX_X : x;
+    x = ((x - MIN_X) * 1000.0) / (MAX_X - MIN_X);
+    *out_x = (int16_t)x;
+
+    y = (y > MAX_Y) ? MAX_Y : y;
+    y = ((y - MIN_Y) * 1000.0) / (MAX_Y - MIN_Y);
+    *out_y = (int16_t)y;
+
+    z = (z > MAX_Z) ? MAX_Z : z;
+    z = ((z - MIN_Z) * 1000.0) / (MAX_Z - MIN_Z);
+    *out_z = (int16_t)z;
+#endif
 
     return 0;
 }

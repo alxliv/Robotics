@@ -5,13 +5,12 @@
 #include "all_timer_task.h"
 #include "gyro_accel.h"
 #include "mag_lis3mdl.h"
+#include "calibrate_magneto.h"
 
-//#define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
+// #define CALIBRATE_MAGNETOMETER // comment that out for a normal operation
 
 #define GYRO_ACCEL_ADDR LSM6DSO_I2C_ADDR
 #define MAGNETO_METER_ADDR LIS3MDL_I2C_ADDR // magnetometer LIS3MDL sensor
-
-extern void calibrate_magneto();
 
 // Pico W devices use a GPIO on the WIFI chip for the LED,
 // so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined
@@ -50,13 +49,13 @@ int i2c_read_regs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_t le
     if (retc != 1)
     {
         printf("i2c_write failed (len=%d, retc=%d)\n", 1, retc);
-        hard_assert(false);
+//        hard_assert(false);
     }
     retc = i2c_read_blocking(i2c_default, dev_addr, data, len, false);
     if (retc != len)
     {
         printf("i2c_read failed (len=%d, retc=%d)\n", len, retc);
-        hard_assert(false);
+ //       hard_assert(false);
     }
     return 0;
 }
@@ -229,25 +228,33 @@ int compute_tilt_compensated_north(
 void info_callback(TimerTask *tt, uint32_t now_us)
 {
 #if 0
-    SENSOR_DATA *sd = &accelData;
+//    SENSOR_DATA *sd = &accelData;
     // SENSOR_DATA *sd = &gyroData;
-    // SENSOR_DATA *sd = &magnetoData;
+    SENSOR_DATA *sd = &magnetoData;
 
     printf("%d,%d,%d\n", sd->mX, sd->mY, sd->mZ);
+
 #endif
 
 #if 1
     float out_nx, out_ny, out_nz;
     float heading_deg;
-    compute_tilt_compensated_north(
-        accelData.mX, accelData.mY, accelData.mZ,
-        magnetoData.mX, magnetoData.mY, magnetoData.mZ,
-        &out_nx, &out_ny, &out_nz,
-        &heading_deg);
+
+    float mx, my, mz;
+    magnetometer_apply_calibration(magnetoData.mX, magnetoData.mY, magnetoData.mZ, &mx, &my, &mz);
+
+    if (compute_tilt_compensated_north(
+            accelData.mX, accelData.mY, accelData.mZ,
+            mx, my, mz,
+            &out_nx, &out_ny, &out_nz,
+            &heading_deg) != 0)
+    {
+        printf("compute_tilt_failed!\n");
+        return;
+    }
 
     printf("%f\n", heading_deg);
 #endif
-
 }
 
 static void led_callback(TimerTask *tt, uint32_t now_us)
@@ -289,9 +296,10 @@ int main()
     lsm6dso_init();
 
     sleep_ms(3000);
-#ifdef CALIBRATE_MAGNETOMETER
+    load_magneto_calibration();
+
+ #ifdef CALIBRATE_MAGNETOMETER
     calibrate_magneto();
-    for (;;){};
 #endif
 
     TimerTask magnetoTask;
