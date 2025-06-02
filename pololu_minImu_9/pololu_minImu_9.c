@@ -154,6 +154,36 @@ void i2c_scan(i2c_inst_t *i2c)
     printf("Scan complete.\n");
 }
 
+// Global (or static) filtered values, initialized once:
+static float Nx_filt = 0, Ny_filt = 0, Nz_filt = 0;
+
+// Tweak α based on your sample rate.
+// For example, if you update at 100 Hz and want a cutoff ≈5 Hz, α ≈ 0.1.
+#define ALPHA  (0.8f)
+
+static void filter_north_vector(float Nx_raw, float Ny_raw, float Nz_raw,
+                         float *Nx_out, float *Ny_out, float *Nz_out)
+{
+    // One‐pole low‐pass:
+    Nx_filt = ALPHA * Nx_raw + (1.0f - ALPHA) * Nx_filt;
+    Ny_filt = ALPHA * Ny_raw + (1.0f - ALPHA) * Ny_filt;
+    Nz_filt = ALPHA * Nz_raw + (1.0f - ALPHA) * Nz_filt;
+
+    // Optionally renormalize to unit length (since small drift can
+    // make the vector no longer exactly unit‐length).
+    float norm = sqrtf(Nx_filt*Nx_filt + Ny_filt*Ny_filt + Nz_filt*Nz_filt);
+    if (norm > 1e-6f) {
+        *Nx_out = Nx_filt / norm;
+        *Ny_out = Ny_filt / norm;
+        *Nz_out = Nz_filt / norm;
+    } else {
+        // fallback if division by zero risk
+        *Nx_out = Nx_raw;
+        *Ny_out = Ny_raw;
+        *Nz_out = Nz_raw;
+    }
+}
+
 /*
  * Given:
  *   ax, ay, az = raw accelerometer readings (e.g. in [g] or any units proportional to gravity).
@@ -179,13 +209,8 @@ int compute_tilt_compensated_north(
     float gy = ay / normA;
     float gz = az / normA;
 
-    // 2) Normalize magnetometer: m = mag / ||mag||
-    float normM = sqrtf(mx * mx + my * my + mz * mz);
-    if (normM < 1e-6f)
-        return -1; // invalid mag vector
-    float mxn = mx / normM;
-    float myn = my / normM;
-    float mzn = mz / normM;
+    float mxn,myn,mzn;
+    filter_north_vector(mx, my, mz, &mxn, &myn, &mzn);
 
     // 3) East = m × g
     float Ex = myn * gz - mzn * gy;
