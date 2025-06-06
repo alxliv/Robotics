@@ -16,6 +16,7 @@ void httpd_init(void);
 
 static absolute_time_t wifi_connected_time;
 static bool led_on = false;
+static char hostname[sizeof(CYW43_HOST_NAME) + 4];
 
 // Be aware of LWIP_HTTPD_MAX_TAG_NAME_LEN
 static const char *ssi_tags[] = {
@@ -86,10 +87,12 @@ u16_t ssi_example_ssi_handler(const char *ssi_tag_name, char *pcInsert, int iIns
 )
 {
     size_t printed;
-    int iIndex = -1;
+    int iIndex = 0;
 
-    printf("ssi (%s)\n", ssi_tag_name);
+ //   printf("ssi (%s), current_tag_part=%d\n", ssi_tag_name, current_tag_part);
+
      int tot = sizeof(ssi_tags) / sizeof(char *);
+
     for (int i = 0; i < tot; i++)
     {
         if (strcmp(ssi_tag_name, ssi_tags[i]) == 0)
@@ -108,7 +111,7 @@ u16_t ssi_example_ssi_handler(const char *ssi_tag_name, char *pcInsert, int iIns
     }
     case 1:
     { // "welcome"
-        printed = snprintf(pcInsert, iInsertLen, "Hello from Pico");
+        printed = snprintf(pcInsert, iInsertLen, "Hello from %s", hostname);
         break;
     }
     case 2:
@@ -208,6 +211,7 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p)
         if (val)
         {
             led_on = (strcmp(val, "ON") == 0) ? true : false;
+            printf("post_receive, led_on=%d\n", led_on);
             cyw43_gpio_set(&cyw43_state, 0, led_on);
             ret = ERR_OK;
         }
@@ -218,14 +222,19 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p)
 
 void httpd_post_finished(void *connection, char *response_uri, u16_t response_uri_len)
 {
+     snprintf(response_uri, response_uri_len, "/index.shtml");
+#if 0
     snprintf(response_uri, response_uri_len, "/ledfail.shtml");
     if (current_connection == connection)
     {
         snprintf(response_uri, response_uri_len, "/ledpass.shtml");
     }
+#endif
+
     current_connection = NULL;
 }
-#endif
+
+#endif // of LWIP_HTTPD_SUPPORT_POST
 
 int main()
 {
@@ -236,8 +245,8 @@ int main()
         return 1;
     }
     cyw43_arch_enable_sta_mode();
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
 
-    char hostname[sizeof(CYW43_HOST_NAME) + 4];
     memcpy(&hostname[0], CYW43_HOST_NAME, sizeof(CYW43_HOST_NAME) - 1);
     get_mac_ascii(CYW43_HAL_MAC_WLAN0, 8, 4, &hostname[sizeof(CYW43_HOST_NAME) - 1]);
     hostname[sizeof(hostname) - 1] = '\0';
@@ -290,11 +299,11 @@ int main()
         cyw43_arch_poll();
         cyw43_arch_wait_for_work_until(led_time);
 #else
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+ //       cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
         sleep_ms(500);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+//        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
         sleep_ms(500);
-        if (nloop % 5 == 0)
+        if (nloop % 10 == 0)
             printf("[%d] http\n", nloop);
 #endif
     }

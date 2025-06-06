@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "python_tools"
+		},
+		{
+			"path": "http_server"
 		}
 	],
 	"settings": {

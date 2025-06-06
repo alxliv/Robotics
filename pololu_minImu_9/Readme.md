@@ -16,3 +16,6 @@ target_link_libraries(pololu_minImu_9
 
 >[!IMPORTANT]
 >Raspberry PI PIco Project Extension -> before **Debug Project** - always select Build Type to *Debug* (use Switch Build Type)
+
+Pico 2W Debug Setup:
+![Pico 2W debug setup](images/pico2_w_debug_setup.jpg)

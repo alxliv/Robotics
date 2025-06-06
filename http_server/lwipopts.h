@@ -14,9 +14,10 @@
 /* If you want “raw” SSI (i.e. <!--#echo var="…" -->), use RAW_SSI = 0 on newer lwIP */
 /* On lwIP 2.x: set LWIP_HTTPD_SSI_RAW  to 1 for raw parsing; or 0 for partial. */
 #define LWIP_HTTPD_SSI_RAW      1
+#define LWIP_HTTPD_SSI_MULTIPART 1
 
 /* (Optional) If you want to use built‐in debug prints from HTTPD: */
-#define HTTPD_DEBUG                LWIP_DBG_ON
+// #define HTTPD_DEBUG                LWIP_DBG_ON
 
 
 #define LWIP_HTTPD_SUPPORT_POST 1
