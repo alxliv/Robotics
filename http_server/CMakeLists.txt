@@ -31,7 +31,7 @@ include(pico_sdk_import.cmake)
 project(http_server C CXX ASM)
 
 set(WIFI_SSID "Alexander")
-set(WIFI_PASSWORD "*******")
+set(WIFI_PASSWORD "*********")
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
@@ -46,20 +46,21 @@ target_include_directories(http_server PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts
         ${PICO_LWIP_CONTRIB_PATH}/apps/httpd
         )
+
 target_compile_definitions(http_server PRIVATE
         WIFI_SSID=\"${WIFI_SSID}\"
         WIFI_PASSWORD=\"${WIFI_PASSWORD}\"
         )
 
 
-        pico_add_library(pico_httpd_content NOFLAG)
-        pico_set_lwip_httpd_content(pico_httpd_content INTERFACE
-                ${CMAKE_CURRENT_LIST_DIR}/content/404.html
-                ${CMAKE_CURRENT_LIST_DIR}/content/index.shtml
-                ${CMAKE_CURRENT_LIST_DIR}/content/test.shtml
-                ${CMAKE_CURRENT_LIST_DIR}/content/ledpass.shtml
-                ${CMAKE_CURRENT_LIST_DIR}/content/ledfail.shtml
-                ${CMAKE_CURRENT_LIST_DIR}/content/img/rpi.png
+pico_add_library(pico_httpd_content NOFLAG)
+pico_set_lwip_httpd_content(pico_httpd_content INTERFACE
+                ${CMAKE_CURRENT_LIST_DIR}/www/404.html
+                ${CMAKE_CURRENT_LIST_DIR}/www/index.shtml
+                ${CMAKE_CURRENT_LIST_DIR}/www/test.shtml
+                ${CMAKE_CURRENT_LIST_DIR}/www/ledpass.shtml
+                ${CMAKE_CURRENT_LIST_DIR}/www/ledfail.shtml
+                ${CMAKE_CURRENT_LIST_DIR}/www/img/rpi.png
         )
 
 target_link_libraries(http_server
