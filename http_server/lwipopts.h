@@ -4,8 +4,21 @@
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
+/* Tell HTTPD to use our custom fsdata (instead of the built-in demo). */
+#define HTTPD_USE_CUSTOM_FSDATA    1
+#define HTTPD_FSDATA_FILE          "../generated/pico_fsdata.inc"
+
 #define LWIP_HTTPD_CGI 1
 #define LWIP_HTTPD_SSI 1
+
+/* If you want “raw” SSI (i.e. <!--#echo var="…" -->), use RAW_SSI = 0 on newer lwIP */
+/* On lwIP 2.x: set LWIP_HTTPD_SSI_RAW  to 1 for raw parsing; or 0 for partial. */
+#define LWIP_HTTPD_SSI_RAW      1
+
+/* (Optional) If you want to use built‐in debug prints from HTTPD: */
+#define HTTPD_DEBUG                LWIP_DBG_ON
+
+
 #define LWIP_HTTPD_SUPPORT_POST 1
 
 // allow override in some examples
