@@ -1,7 +1,9 @@
 <html>
+
 <head>
     <title>Pico httpd example</title>
 </head>
+
 <body>
     <h1>Pico httpd example</h1>
     <!--
@@ -9,19 +11,27 @@
     -->
     <p><!--#welcome--></p>
     <p>Uptime is <!--#uptime--> seconds</p>
+
     <p><a href="/?test">CGI handler test</a></p>
     <hr>
     <h3>Led State is <!--#ledstate--> </h3>
+    <ul>
+        <li><a href="/control?led=on">Turn LED ON</a></li>
+        <li><a href="/control?led=off">Turn LED OFF</a></li>
+        <li><a href="/control?led=on&speed=50">LED ON &amp; Speed=50</a></li>
+    </ul>
+
     <p>
-        <form action="/led.cgi" method="post">
-            <p>Turn LED
+    <form action="/led.cgi" method="post">
+        <p>Turn LED
             <input type="submit" name="led_state" value="ON" />
-            </p>
-            <hr>
-            <p>Turn LED
+        </p>
+        <hr>
+        <p>Turn LED
             <input type="submit" name="led_state" value="OFF" />
-            </p>
-        </form>
+        </p>
+    </form>
     </p>
 </body>
+
 </html>

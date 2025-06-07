@@ -71,12 +71,37 @@ static const char *cgi_handler_test(int iIndex, int iNumParams, char *pcParam[],
     }
     return "/index.shtml";
 }
-#if 1
+
+static const char *cgi_control_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[])
+{
+    for (int i = 0; i < iNumParams; i++) {
+        if (strcmp(pcParam[i], "led") == 0) {
+            if (strcmp(pcValue[i], "on") == 0) {
+                led_on = true;
+            } else if (strcmp(pcValue[i], "off") == 0) {
+                led_on = false;
+            }
+            cyw43_gpio_set(&cyw43_state, 0, led_on);
+        }
+        else if (strcmp(pcParam[i], "motor") == 0) {
+            // e.g. /control?motor=forward&speed=80
+            // handle motor direction...
+        }
+        else if (strcmp(pcParam[i], "speed") == 0) {
+            int sp = atoi(pcValue[i]);
+            printf("Set speed to: %d\n", sp);
+            // clamp and apply to PWM, etc...
+        }
+    }
+   return "/index.shtml";
+}
+
 static tCGI cgi_handlers[] = {
     {"/", cgi_handler_test},
-    {"/index.shtml", cgi_handler_test},
+//    {"/index.shtml", cgi_handler_test},
+    {"/control", cgi_control_handler}
 };
-#endif
+
 
 // Note that the buffer size is limited by LWIP_HTTPD_MAX_TAG_INSERT_LEN, so use LWIP_HTTPD_SSI_MULTIPART to return larger amounts of data
 u16_t ssi_example_ssi_handler(const char *ssi_tag_name, char *pcInsert, int iInsertLen
