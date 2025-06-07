@@ -2,6 +2,21 @@
 
 cmake_minimum_required(VERSION 3.13)
 
+
+set(WIFI_SSID "Dummy_SSID")
+set(WIFI_PASSWORD "Dummy_PASS")
+
+# add your actual SSID and WIFI Password into local.settings.cmake
+include(${CMAKE_CURRENT_LIST_DIR}/local_settings.cmake OPTIONAL)
+# --------------------------------------------
+# check for the dummy password
+if (WIFI_PASSWORD MATCHES "^Dummy")
+  message(WARNING
+    "WIFI_PASSWORD is still the dummy value ('${WIFI_PASSWORD}')!!.\n"
+    "Set your WiFi password in local_settings.cmake"
+  )
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -29,10 +44,6 @@ set(PICO_BOARD pico2_w CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
 project(http_server C CXX ASM)
-
-set(WIFI_SSID "Alexander")
-
-set(WIFI_PASSWORD "*********")
 
 
 # Initialise the Raspberry Pi Pico SDK
